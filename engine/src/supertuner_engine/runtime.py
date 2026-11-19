@@ -543,9 +543,25 @@ def _default_run_id(ctx: Context) -> str:
     return "adhoc"
 
 
-def plan_for(spec: RunSpec, ctx: Context, registry: Registry | None = None) -> RunPlan:
-    """Compile without executing; exposed for `run --dry-run` and tests."""
-    return compile_spec(spec, ctx, registry)
+def plan_for(
+    spec: RunSpec,
+    ctx: Context,
+    registry: Registry | None = None,
+    measured_vram_mib: int | None = None,
+    measured_ram_mib: int | None = None,
+) -> RunPlan:
+    """Compile without executing; exposed for `run --dry-run` and tests.
+
+    实测进预算（v0.2 T2 / G3 = AP-01）：两个实测值原样透传给 compile_spec；
+    调用方不传时 compile_spec 按 None 处理，行为与改动前一致。
+    """
+    return compile_spec(
+        spec,
+        ctx,
+        registry,
+        measured_vram_mib=measured_vram_mib,
+        measured_ram_mib=measured_ram_mib,
+    )
 
 
 def planned_commands(plan: ExecutionPlan) -> list[list[str]]:

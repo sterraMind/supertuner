@@ -131,7 +131,21 @@ def compile(
         _fail(f"无法解析 spec：{exc}", code=EXIT_INFEASIBLE)
 
     ctx = _context(run_dir)
-    compiled = plan_for(run_spec, ctx)
+    # 实测进预算（v0.2 T2 / G3 = AP-01）：与 plan_cmd 同源——budget_source 为
+    # auto 时探测本机实测 VRAM/RAM 交给编译流程；为 manual 时传 None，手填预算
+    # 原样生效。probe() 永不抛异常（无 torch 也安全）。
+    measured_vram_mib: int | None = None
+    measured_ram_mib: int | None = None
+    if run_spec.config.budget_source == "auto":
+        env_report = probe()
+        measured_vram_mib = available_vram_mib(env_report)
+        measured_ram_mib = env_report.ram_mib
+    compiled = plan_for(
+        run_spec,
+        ctx,
+        measured_vram_mib=measured_vram_mib,
+        measured_ram_mib=measured_ram_mib,
+    )
 
     if out is not None:
         out.parent.mkdir(parents=True, exist_ok=True)

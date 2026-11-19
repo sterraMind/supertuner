@@ -20,7 +20,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from .config import Context
-from .plan import resolve_config
+from .plan import _resolve_budget, resolve_config
 from .plugins import Registry, Selection, load_registry
 from .schema import (
     LLM_FAMILIES,
@@ -273,6 +273,8 @@ def compile_spec(
     spec: RunSpec,
     ctx: Context,
     registry: Registry | None = None,
+    measured_vram_mib: int | None = None,
+    measured_ram_mib: int | None = None,
 ) -> RunPlan:
     """Compile `spec` against `ctx`. Never raises for user input problems.
 
@@ -280,17 +282,45 @@ def compile_spec(
     ``quant_base``/``blocks_to_swap`` candidate, that effective config is what
     gets validated, selected and compiled (so it reaches the backend argv),
     while the caller's original spec is left untouched for persistence.
+
+    ``measured_vram_mib`` / ``measured_ram_mib`` 是环境探测拿到的本机实测
+    总 VRAM / RAM（MiB），与 ``spec.config.budget_source`` 一起决定计划按哪个
+    预算上限来算——语义和 ``plan()`` 完全一致（v0.2 T2 实测进预算 / G3 =
+    AP-01）。解析出的溯源信息盖在返回的 ``RunPlan.memory`` 上（``budget_source``
+    / ``budget_measured_*``）；不传这两个参数时预算保持原值、盖戳为 "manual"，
+    与改动前行为相同。
     """
     reg = registry if registry is not None else load_registry()
     cfg = spec.config
     auto_applied: list[Issue] = []
     effective_cfg = cfg
+    auto_search_picked = False
     memory: MemoryPlan | None = None
     memory_error: str | None = None
     try:
+        # 实测进预算（v0.2 T2 / G3 = AP-01）：语义与 plan() 完全一致——先按
+        # budget_source 解析出规划实际使用的预算上限，再用解析后的预算重建配置
+        # 传给 resolve_config；resolve 成功后给 MemoryPlan 盖溯源戳。
+        resolved = _resolve_budget(cfg, measured_vram_mib, measured_ram_mib)
+        budgeted_cfg = cfg.model_copy(
+            update={
+                "vram_budget_mib": resolved.vram_budget_mib,
+                "ram_budget_mib": resolved.ram_budget_mib,
+            }
+        )
         # 跑后自校准（v0.2 T1）：把 server 注入的 calibration 只读标注传给规划器，
         # 让它把「已校准 N 次」写进 MemoryPlan.notes；calibration 本身不改预算。
-        effective_cfg, memory = resolve_config(cfg, spec.calibration)
+        effective_cfg, memory = resolve_config(budgeted_cfg, spec.calibration)
+        # 盖溯源戳：与 plan() 相同，feasible / refuse 路径都覆盖（stamping 只在
+        # resolve 成功后执行，ValueError 分支维持 memory=None 现状）。
+        memory.budget_source = resolved.budget_source
+        memory.budget_measured_vram_mib = resolved.measured_vram_mib
+        memory.budget_measured_ram_mib = resolved.measured_ram_mib
+        # spec_for_compile 的 auto_budget 分支语义保持不变（判断「auto_budget
+        # 搜索是否换了候选」）：resolve_config 没做搜索时原样返回收到的
+        # budgeted_cfg，换了候选才返回新对象；规划失败（ValueError）时异常发生在
+        # 这行之前，flag 保持 False，effective_cfg 已退回 cfg，不会误入该分支。
+        auto_search_picked = effective_cfg is not budgeted_cfg
     except ValueError as exc:
         # Planning error is surfaced below as E_PLAN_FAILED / E_PARAMS_UNVERIFIED.
         effective_cfg = cfg
@@ -298,7 +328,7 @@ def compile_spec(
         memory_error = str(exc)
 
     spec_for_compile = spec
-    if effective_cfg is not cfg:
+    if auto_search_picked:
         spec_for_compile = spec.model_copy(update={"config": effective_cfg})
         auto_applied.append(
             issue(
