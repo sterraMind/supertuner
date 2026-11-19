@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="SuperTuner — single-GPU training control plane: plan, compile, supervise." />
+    <meta name="color-scheme" content="light dark" />
+    <title>SuperTuner</title>
+    <script>
+      // Resolve the theme before the first paint so no flash of the wrong palette
+      // can happen. Kept in sync with src/theme/theme.ts (THEME_STORAGE_KEY).
+      (function () {
+        var root = document.documentElement;
+        try {
+          var stored = window.localStorage.getItem("supertuner.theme");
+          var pref = stored === "light" || stored === "dark" || stored === "system" ? stored : "system";
+          var dark =
+            pref === "dark" ||
+            (pref === "system" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          root.setAttribute("data-theme", dark ? "dark" : "light");
+          root.style.colorScheme = dark ? "dark" : "light";
+        } catch (err) {
+          root.setAttribute("data-theme", "light");
+          root.style.colorScheme = "light";
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>SuperTuner needs JavaScript to plan and monitor runs.</noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

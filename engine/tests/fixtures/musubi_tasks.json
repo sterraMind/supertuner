@@ -1,0 +1,23 @@
+{
+  "source": "musubi-tuner docs/wan.md + docs/minimax_h3.md (Apache-2.0, fetched 2026-11)",
+  "tasks": {
+    "wan2.1-t2v-1.3b": {
+      "task": "t2v-1.3B",
+      "network_module": "networks.lora_wan"
+    },
+    "wan2.1-t2v-14b": {
+      "task": "t2v-14B",
+      "network_module": "networks.lora_wan"
+    },
+    "minimax-h3": {
+      "task": "t2va",
+      "network_module": "networks.lora_minimax_h3"
+    }
+  },
+  "unsupported": [
+    {
+      "family": "wan2.2-ti2v-5b",
+      "reason": "upstream has no ti2v-5B task; use DiffSynth-Studio/diffusion-pipe"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "name": "supertuner",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Single-GPU training studio: pretrain, SFT, RL, distillation and LoRA for LLM and video models on consumer hardware.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "packageManager": "pnpm@10.15.0",
+  "scripts": {
+    "build": "pnpm -r --filter \"@supertuner/*\" run build",
+    "typecheck": "pnpm -r --filter \"@supertuner/*\" run typecheck",
+    "test": "pnpm -r --filter \"@supertuner/*\" run test",
+    "dev": "pnpm --filter @supertuner/server run dev",
+    "dev:web": "pnpm --filter @supertuner/web run dev",
+    "engine:setup": "uv sync --project engine --all-extras",
+    "engine:test": "uv run --project engine pytest -q",
+    "format": "prettier --write \"packages/**/src/**/*.{ts,tsx,css}\" \"*.{json,md}\""
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}

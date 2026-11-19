@@ -1,0 +1,72 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "supertuner-engine"
+version = "0.2.0"
+description = "Training engine for SuperTuner: single-GPU LLM and video model training."
+requires-python = ">=3.10,<3.14"
+license = { text = "Apache-2.0" }
+dependencies = [
+  "pydantic>=2.9",
+  "pydantic-settings>=2.5",
+  "typer>=0.12",
+  "rich>=13.7",
+  "safetensors>=0.4",
+  "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+# The heavy torch stack lives here so that `uv sync` without extras stays light
+# (schema/CLI work, unit tests of the planner) and `--all-extras` gets compute.
+torch = [
+  "torch>=2.4",
+  "transformers>=4.44",
+  "peft>=0.13",
+  "accelerate>=1.0",
+  "datasets>=2.20",
+  "tokenizers>=0.19",
+]
+quant = [
+  "bitsandbytes>=0.44; sys_platform != 'win32' or python_version >= '3.10'",
+]
+rl = [
+  "trl>=0.12",
+]
+diffusion = [
+  "diffusers>=0.31",
+  "safetensors>=0.4",
+  "Pillow>=10.0",
+]
+video = [
+  "imageio>=2.34",
+  "imageio-ffmpeg>=0.5",
+]
+dev = [
+  "pytest>=8.0",
+  "pytest-cov>=5.0",
+  "ruff>=0.6",
+]
+
+[project.scripts]
+supertuner-engine = "supertuner_engine.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/supertuner_engine"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.uv]
+package = true

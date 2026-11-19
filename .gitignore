@@ -1,0 +1,41 @@
+# --- node ---
+node_modules/
+.pnpm-store/
+dist/
+*.tsbuildinfo
+.vite/
+coverage/
+
+# --- python ---
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# --- supertuner runtime ---
+.supertuner/
+.supertuner-e2e/
+.supertuner-runs/
+.hf_home/
+pytest-of-*/
+runs/
+artifacts/
+checkpoints/
+logs/
+
+# --- local scratch (never committed) ---
+.drafts/
+.research/*.tmp
+
+# --- local env ---
+.env
+.env.local
+
+# --- editor / os ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

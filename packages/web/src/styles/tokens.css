@@ -1,0 +1,164 @@
+/* ==========================================================================
+   SuperTuner design tokens
+   A warm, instrument-panel palette: paper and graphite in light mode, charcoal
+   and lamp-light in dark mode. One accent (burnt orange) carries action; the
+   categorical hues below are only for data (memory segments, status).
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* type ------------------------------------------------------------------ */
+  --font-sans: ui-sans-serif, -apple-system, "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  --text-xs: 11px;
+  --text-sm: 12.5px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 26px;
+  --text-3xl: 34px;
+
+  --leading-tight: 1.2;
+  --leading-normal: 1.5;
+  --tracking-wide: 0.06em;
+  --tracking-tight: -0.01em;
+
+  /* space ----------------------------------------------------------------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+  --space-9: 56px;
+
+  /* shape ----------------------------------------------------------------- */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+  --border-width: 1px;
+  --sidebar-width: 236px;
+  --content-max: 1320px;
+
+  /* surfaces -------------------------------------------------------------- */
+  --bg: #f6f2e9;
+  --bg-elevated: #fffdf8;
+  --bg-sunken: #ebe4d7;
+  --bg-inset: #f1ebdf;
+  --bg-hover: rgba(29, 26, 22, 0.045);
+  --border: #ddd3c1;
+  --border-strong: #c3b6a0;
+  --rule: #e6dfd2;
+
+  --text: #1d1a16;
+  --text-muted: #675f51;
+  --text-faint: #8b8172;
+
+  /* accent ---------------------------------------------------------------- */
+  --accent: #a94f1c;
+  --accent-hover: #8d3f13;
+  --accent-ink: #fff8f0;
+  --accent-soft: rgba(169, 79, 28, 0.1);
+  --accent-line: rgba(169, 79, 28, 0.35);
+
+  /* semantic -------------------------------------------------------------- */
+  --ok: #2c6644;
+  --ok-soft: rgba(44, 102, 68, 0.12);
+  --warn: #855805;
+  --warn-soft: rgba(133, 88, 5, 0.13);
+  --err: #982d22;
+  --err-soft: rgba(152, 45, 34, 0.11);
+  --info: #2b5c76;
+  --info-soft: rgba(43, 92, 118, 0.11);
+
+  /* data series ----------------------------------------------------------- */
+  --series-weights: #8a4a1f;
+  --series-adapter: #b0722f;
+  --series-optimizer: #6e6a35;
+  --series-grad: #40695c;
+  --series-activations: #35657f;
+  --series-other: #7b7086;
+  --series-ram: #9a6a3f;
+
+  /* chart ----------------------------------------------------------------- */
+  --chart-line: #a94f1c;
+  --chart-line-soft: rgba(169, 79, 28, 0.22);
+  --chart-grid: #e3dbcc;
+  --chart-axis: #b7ab97;
+
+  /* elevation / focus ----------------------------------------------------- */
+  --shadow-1: 0 1px 2px rgba(48, 38, 22, 0.06), 0 1px 1px rgba(48, 38, 22, 0.04);
+  --shadow-2: 0 10px 28px rgba(48, 38, 22, 0.09);
+  --focus-color: #a94f1c;
+  --focus-ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--focus-color);
+
+  /* metrics --------------------------------------------------------------- */
+  --mono-nums: var(--font-mono);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #14120e;
+  --bg-elevated: #1c1913;
+  --bg-sunken: #100e0b;
+  --bg-inset: #221f17;
+  --bg-hover: rgba(240, 233, 221, 0.055);
+  --border: #322d23;
+  --border-strong: #4a4233;
+  --rule: #2a261e;
+
+  --text: #f0e9dd;
+  --text-muted: #a79c89;
+  --text-faint: #80765f;
+
+  --accent: #e08a4e;
+  --accent-hover: #ec9d66;
+  --accent-ink: #1a150f;
+  --accent-soft: rgba(224, 138, 78, 0.14);
+  --accent-line: rgba(224, 138, 78, 0.38);
+
+  --ok: #74bd90;
+  --ok-soft: rgba(116, 189, 144, 0.15);
+  --warn: #dda842;
+  --warn-soft: rgba(221, 168, 66, 0.15);
+  --err: #e58073;
+  --err-soft: rgba(229, 128, 115, 0.15);
+  --info: #85b5cd;
+  --info-soft: rgba(133, 181, 205, 0.15);
+
+  --series-weights: #d99a63;
+  --series-adapter: #e0b174;
+  --series-optimizer: #b9b26a;
+  --series-grad: #7fb69f;
+  --series-activations: #7fb0c9;
+  --series-other: #ab9fb8;
+  --series-ram: #d1a071;
+
+  --chart-line: #e08a4e;
+  --chart-line-soft: rgba(224, 138, 78, 0.25);
+  --chart-grid: #2d2820;
+  --chart-axis: #5c5343;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-2: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --focus-color: #e08a4e;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-base: 0ms;
+  }
+}
+
+:root {
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+}

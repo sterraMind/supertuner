@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "useDefineForClassFields": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "types": ["vite/client", "node"],
+    "baseUrl": ".",
+    "paths": {
+      "@supertuner/core": ["../core/src/index.ts"],
+      "@supertuner/core/contracts": ["../core/src/contracts.ts"],
+      "@supertuner/core/events": ["../core/src/events.ts"],
+      "@supertuner/core/plugins": ["../core/src/plugins.ts"],
+      "@supertuner/core/recipes": ["../core/src/recipes.ts"]
+    }
+  },
+  "include": ["src"]
+}
