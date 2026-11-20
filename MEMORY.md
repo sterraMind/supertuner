@@ -29,6 +29,14 @@
 - **T6 单向换块区间（AP-08）+ T7 NVFP4+probe 已完成**：`MemoryPlan` 增 `swap_floor_s`（单向 H2D 下限）/`swap_roundtrip_floor_s`（2×）/`step_time_band_s`（「不含注意力/计算」）；`QuantBase.NVFP4`（0.5625 B/param）加入自动搜索阶梯；`env.py` 探测 triton/liger_kernel/sageattention 记入 `EnvReport.capabilities`。独立评审补 NVFP4 一致性：`compiler.py` 与 `native_llm.py` 对 LLM 家族拒绝 NVFP4（同 INT8/FP8，E_QUANT_UNSUPPORTED），`H3_EDGE_QUANTS` 纳入 NVFP4（plan/compile 一致）。
 - **v0.2 全量回归（收口）**：engine 230 / core 25 / server 52 / web 68 全绿；`pnpm typecheck` 与 `pnpm build` 通过（web JS 445.32 kB / gzip 130.98 kB）。T1–T7 全部完成，v0.2 收口。
 
+## v0.3 方向调整（2026-11-20，用户"高人指点"）
+- 定位从"再做训练器"改为"训练实验与验证层"：训练框架（musubi/Fizgig）是工具，SuperTuner 回答"什么数据→什么效果、什么训法→什么问题"，支撑更强编辑/更长视频/更强提示词遵循/更多场景。DMD/DMAD 与自研算子暂缓。
+- 落盘 `docs/development/05-experiment-harness.md`（评估指标 + 单变量矩阵 + 8GB/免费云分档 + v0.3 优先级）与 `docs/research/08-trainer-code-analysis.md`（197 行，深读 musubi@f8a1b03 与 Fizgig@b5199ee，25 条结论表 + 16 项可实验变量，均有 file:line 依据）。
+- **关键发现（影响后续所有视频实验前提）**：H3 检查点是 CFG 蒸馏过的，普通 flow-matching LoRA 会 wash out（视频随步数变差、纯图像约 50 步崩坏）。H3 LoRA 必须三选一：de-distill adapter / guidance loss / teacher matching；身份 LoRA 走 teacher 匹配（teacher 看首尾帧/参考片段/主体参考图，学生 caption 只留触发词）。Wan2.2 无此问题，可先做 Wan/LLM 线建立评估闭环。
+- **8GB H3 修正**：Fizgig "8GB 起"针对其它家族（Krea2/Flux/Anima/SDXL），H3 本身最低 16GB（12GB 需 4-bit）。SuperTuner 现有 H3 8GB 配方标 unverified 是对的。
+- 数据契约先于超参：H3 帧数 17n+5、24fps、16 整除；无 caption dropout（正则靠 teacher 体系 + network_dropout + DC 衰减）；checkpoint 按 teacher 残差 plateau 选，不按 loss 最小。
+- 低精度是隐式训练变量：NF4 基座 ~9% 误差消耗 LoRA 容量；int8 反向余弦 0.2-0.6 不可用（W8A16 是修正）；TREAD/只训 20-49 块/预览降档各有对应效果丢失通路。
+
 ## 关键环境事实
 
 - GPU：RTX 3070 Ti Laptop 8GB，驱动 621.14；CPU i7-12700H；RAM 31.7 GiB；C 盘约 143 GB。
