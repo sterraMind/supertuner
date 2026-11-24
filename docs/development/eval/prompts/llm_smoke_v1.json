@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "name": "llm_smoke_v1",
+  "description": "Frozen smoke prompt set for LLM SFT/preference/RL sanity evaluation (v0.3 P0). Short prompts, deterministic greedy generation, lightweight heuristic scoring. Not a benchmark.",
+  "seed": 42,
+  "max_new_tokens": 64,
+  "prompts": [
+    {
+      "id": "gsm8k_like_01",
+      "prompt": "Question: If a shop has 12 apples and sells 5, how many apples are left?\nAnswer:",
+      "reference": "7",
+      "tags": ["math", "short"]
+    },
+    {
+      "id": "gsm8k_like_02",
+      "prompt": "Question: A train travels 60 km in 1 hour. How far does it travel in 3 hours at the same speed?\nAnswer:",
+      "reference": "180 km",
+      "tags": ["math", "short"]
+    },
+    {
+      "id": "instruction_01",
+      "prompt": "Write one sentence that explains why the sky looks blue.",
+      "tags": ["instruction", "explanation"]
+    },
+    {
+      "id": "instruction_02",
+      "prompt": "List three fruits, separated by commas.",
+      "reference": "apple, banana, orange",
+      "tags": ["instruction", "list"]
+    },
+    {
+      "id": "completion_01",
+      "prompt": "The capital of France is",
+      "reference": "Paris",
+      "tags": ["factual", "completion"]
+    },
+    {
+      "id": "instruction_zh_01",
+      "prompt": "请用一句话解释什么是机器学习。",
+      "tags": ["instruction", "zh"]
+    }
+  ]
+}

@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "name": "video_eval_v1",
+  "description": "Frozen video evaluation prompt set for prompt-adherence and technical quality measurement (v0.3 P0). Prompts map onto VBench custom_input technical dimensions plus a manual/LLM prompt-adherence rubric. Deterministic: fixed seed, resolution, and frame count per entry so base-vs-LoRA comparisons isolate the adapter.",
+  "seed": 42,
+  "fps": 24,
+  "frames": 125,
+  "resolution": {
+    "width": 768,
+    "height": 512
+  },
+  "guidance": {
+    "notes": "H3 官方权重做过 guidance distillation，同 prompt + 同 seed 下 scale 0 与 scale 1 各跑一次才能隔离 LoRA 效果；每条条目都成对生成。"
+  },
+  "dimensions_technical": [
+    "subject_consistency",
+    "background_consistency",
+    "motion_smoothness",
+    "dynamic_degree",
+    "aesthetic_quality",
+    "imaging_quality"
+  ],
+  "dimension_semantic_note": "semantic 类 9 维（action/object/color/spatial/character/number/style/special_relationship/human_interaction）需 VBench 标准 prompt 集 + detectron2，与本项目无冲突，但需独立 venv。",
+  "prompt_adherence_rubric": [
+    "1. 每条条目生成 base(scale=0) 与 lora(scale=1) 两个视频，同 seed 同分辨率同帧数。",
+    "2. 人工或 MLLM 评分员对 expected_attributes 逐条 0/1 打分，blind、左右随机。",
+    "3. 报告 adherence rate = 属性命中数 / 属性总数，并报告 Krippendorff alpha。",
+    "4. 同批跑 VBench 6 维技术质量，与 adherence rate 一起作为回归证据。"
+  ],
+  "prompts": [
+    {
+      "id": "subject_identity_01",
+      "category": "prompt_adherence",
+      "prompt": "A young woman with short black hair wearing a red wool coat walks through a snowy park toward the camera.",
+      "expected_attributes": ["woman", "short black hair", "red wool coat", "snowy park", "walking toward camera"],
+      "dimension_hint": "subject_consistency"
+    },
+    {
+      "id": "subject_identity_02",
+      "category": "prompt_adherence",
+      "prompt": "A bald man in a navy suit sits at a wooden desk and signs a document with a fountain pen.",
+      "expected_attributes": ["bald man", "navy suit", "wooden desk", "signing document", "fountain pen"],
+      "dimension_hint": "subject_consistency"
+    },
+    {
+      "id": "background_scene_01",
+      "category": "prompt_adherence",
+      "prompt": "A slow pan across a cobblestone alley in an old European town at dusk, street lamps just turning on.",
+      "expected_attributes": ["cobblestone alley", "European town", "dusk", "street lamps on", "slow pan"],
+      "dimension_hint": "background_consistency"
+    },
+    {
+      "id": "background_scene_02",
+      "category": "prompt_adherence",
+      "prompt": "Inside a bright modern kitchen with white cabinets, a window shows a green garden outside.",
+      "expected_attributes": ["bright kitchen", "white cabinets", "window", "green garden"],
+      "dimension_hint": "background_consistency"
+    },
+    {
+      "id": "motion_camera_01",
+      "category": "prompt_adherence",
+      "prompt": "A red sports car drives along a coastal road, camera follows from behind in a smooth tracking shot.",
+      "expected_attributes": ["red sports car", "coastal road", "tracking shot from behind", "smooth motion"],
+      "dimension_hint": "motion_smoothness"
+    },
+    {
+      "id": "motion_camera_02",
+      "category": "prompt_adherence",
+      "prompt": "A golden retriever runs across a grassy field, camera follows alongside in slow motion.",
+      "expected_attributes": ["golden retriever", "grassy field", "running", "camera tracks alongside"],
+      "dimension_hint": "motion_smoothness"
+    },
+    {
+      "id": "action_dynamic_01",
+      "category": "prompt_adherence",
+      "prompt": "A surfer rides a large wave, crouching low and carving the board through the water.",
+      "expected_attributes": ["surfer", "large wave", "crouching", "carving"],
+      "dimension_hint": "dynamic_degree"
+    },
+    {
+      "id": "action_dynamic_02",
+      "category": "prompt_adherence",
+      "prompt": "Fireworks explode in the night sky above a city skyline, colorful bursts in sequence.",
+      "expected_attributes": ["fireworks", "night sky", "city skyline", "colorful", "sequential bursts"],
+      "dimension_hint": "dynamic_degree"
+    },
+    {
+      "id": "style_aesthetic_01",
+      "category": "prompt_adherence",
+      "prompt": "A hand-painted watercolor animation of a small village on a hillside, soft pastel colors, gentle wind.",
+      "expected_attributes": ["watercolor animation", "village on hillside", "pastel colors", "gentle wind"],
+      "dimension_hint": "aesthetic_quality"
+    },
+    {
+      "id": "style_aesthetic_02",
+      "category": "prompt_adherence",
+      "prompt": "A cinematic close-up of a cup of black coffee on a marble counter, shallow depth of field, warm morning light.",
+      "expected_attributes": ["close-up", "cup of black coffee", "marble counter", "shallow depth of field", "warm morning light"],
+      "dimension_hint": "imaging_quality"
+    },
+    {
+      "id": "style_cinematic_03",
+      "category": "prompt_adherence",
+      "prompt": "A film-noir scene in a dimly lit bar, high contrast black-and-white, cigarette smoke drifting.",
+      "expected_attributes": ["film-noir", "dimly lit bar", "high contrast black-and-white", "cigarette smoke"],
+      "dimension_hint": "aesthetic_quality"
+    },
+    {
+      "id": "product_static_04",
+      "category": "prompt_adherence",
+      "prompt": "A silver wristwatch rotates slowly on a black pedestal, studio lighting, clean dark background.",
+      "expected_attributes": ["silver wristwatch", "rotating slowly", "black pedestal", "studio lighting", "clean dark background"],
+      "dimension_hint": "imaging_quality"
+    }
+  ]
+}
