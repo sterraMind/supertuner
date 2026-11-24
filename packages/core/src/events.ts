@@ -120,6 +120,18 @@ export const PhaseEndEvent = z.object({
  *  摘要（更多 block swap / 更低量化 / 更低显存预算）。字段与 engine 侧
  *  `events.py::Emitter.oom_retry` 一一对应。
  */
+
+/**
+ * v0.3 P0 训练/评估汇总报告：稳定性、过拟合、可选 prompt 评估与（视频）契约占位。
+ * 由 engine 在训练结束后（或独立 evaluator）写出 eval_report.json 并随事件发送摘要。
+ */
+export const EvalReportEvent = z.object({
+  ...base,
+  type: z.literal("eval_report"),
+  status: z.enum(["ok", "partial", "skipped", "unavailable"]).default("ok"),
+  path: z.string().nullable().default(null),
+  report: z.record(z.string(), z.unknown()).default({}),
+});
 export const OOMRetryEvent = z.object({
   ...base,
   type: z.literal("oom_retry"),
@@ -142,6 +154,7 @@ export const RunEventSchema = z.discriminatedUnion("type", [
   PhaseEndEvent,
   RunEndEvent,
   MemoryReportEvent,
+  EvalReportEvent,
   OOMRetryEvent,
 ]);
 
@@ -156,6 +169,7 @@ export type PhaseStart = z.infer<typeof PhaseStartEvent>;
 export type PhaseEnd = z.infer<typeof PhaseEndEvent>;
 export type RunEnd = z.infer<typeof RunEndEvent>;
 export type MemoryReport = z.infer<typeof MemoryReportEvent>;
+export type EvalReport = z.infer<typeof EvalReportEvent>;
 export type OOMRetry = z.infer<typeof OOMRetryEvent>;
 
 /** Parse one JSONL line. Returns the reason instead of throwing on bad input. */

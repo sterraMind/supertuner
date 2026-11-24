@@ -27,6 +27,7 @@ from typing import Any
 
 from ..config import Context
 from ..events import Emit
+from .eval_report import build_eval_report, write_eval_report
 from ..schema import (
     LLM_FAMILIES,
     Adapter,
@@ -179,7 +180,8 @@ class NativeLLMBackend:
         artifacts = [
             str(ctx.output_dir / "adapter" / "adapter_model.safetensors")
             if cfg.adapter != Adapter.NONE
-            else str(ctx.output_dir / "model" / "model.safetensors")
+            else str(ctx.output_dir / "model" / "model.safetensors"),
+            str(ctx.output_dir / "eval_report.json"),
         ]
 
         notes = [
@@ -559,6 +561,8 @@ def train(spec: RunSpec, ctx: Context, emit: Emit) -> None:
     device = _select_device(torch, cfg.precision, emit)
     dtype = _select_dtype(torch, cfg.precision, device, emit)
     tracker = _PeakTracker()
+    train_curve: list[dict[str, Any]] = []
+    eval_curve: list[dict[str, Any]] = []
 
     model_path = ctx.model_path(cfg.family, cfg.model_path)
     if model_path is None or not model_path.exists():
@@ -698,6 +702,19 @@ def train(spec: RunSpec, ctx: Context, emit: Emit) -> None:
             start_step=start_step,
             total_steps=total_steps,
             tracker=tracker,
+            train_curve=train_curve,
+            eval_curve=eval_curve,
+        )
+        _emit_eval_report(
+            spec,
+            ctx,
+            emit,
+            train_curve,
+            eval_curve,
+            extra={"stage": Stage.RL.value},
+            model=model,
+            tokenizer=tokenizer,
+            device=device,
         )
         _emit_memory_report(device, spec, ctx, emit, tracker)
         return
@@ -717,6 +734,19 @@ def train(spec: RunSpec, ctx: Context, emit: Emit) -> None:
             start_step=start_step,
             total_steps=total_steps,
             tracker=tracker,
+            train_curve=train_curve,
+            eval_curve=eval_curve,
+        )
+        _emit_eval_report(
+            spec,
+            ctx,
+            emit,
+            train_curve,
+            eval_curve,
+            extra={"stage": Stage.PREFERENCE.value},
+            model=model,
+            tokenizer=tokenizer,
+            device=device,
         )
         _emit_memory_report(device, spec, ctx, emit, tracker)
         return
@@ -772,20 +802,35 @@ def train(spec: RunSpec, ctx: Context, emit: Emit) -> None:
             torch.cuda.max_memory_allocated() / (1024 * 1024) if device == "cuda" else None
         )
         tracker.record(vram_peak)
+        step_loss = window_loss / grad_accum
+        step_lr = float(scheduler.get_last_lr()[0])
+        step_tps = (window_tokens / elapsed) if elapsed > 0 else None
         emit.step(
             step,
-            loss=window_loss / grad_accum,
-            lr=float(scheduler.get_last_lr()[0]),
+            loss=step_loss,
+            lr=step_lr,
             grad_norm=float(grad_norm),
-            tokens_per_s=(window_tokens / elapsed) if elapsed > 0 else None,
+            tokens_per_s=step_tps,
             vram_peak_mib=float(vram_peak) if vram_peak is not None else None,
             elapsed_s=elapsed,
+        )
+        train_curve.append(
+            {
+                "step": step,
+                "loss": float(step_loss),
+                "lr": step_lr,
+                "grad_norm": float(grad_norm),
+                "tokens_per_s": float(step_tps) if step_tps is not None else None,
+                "vram_peak_mib": float(vram_peak) if vram_peak is not None else None,
+                "elapsed_s": float(elapsed),
+            }
         )
 
         if eval_batches is not None and spec.train.eval_every > 0 and step % spec.train.eval_every == 0:
             metrics = _evaluate(torch, model, eval_batches, device, amp_dtype, emit)
             if metrics:
                 emit.eval(step, metrics)
+                eval_curve.append({"step": step, "metrics": dict(metrics)})
 
         if spec.train.save_every > 0 and step % spec.train.save_every == 0 and step < total_steps:
             _save_checkpoint(
@@ -802,9 +847,75 @@ def train(spec: RunSpec, ctx: Context, emit: Emit) -> None:
     final_dir = ctx.output_dir / ("adapter" if cfg.adapter != Adapter.NONE else "model")
     _save_checkpoint(model, tokenizer, optimizer, scheduler, step, spec, ctx, emit, final_dir)
     emit.log("info", f"训练完成：{step} steps，产物在 {final_dir}")
+    _emit_eval_report(
+        spec,
+        ctx,
+        emit,
+        train_curve,
+        eval_curve,
+        extra={"stage": cfg.stage.value},
+        model=model,
+        tokenizer=tokenizer,
+        device=device,
+        amp_dtype=amp_dtype,
+    )
     _emit_memory_report(device, spec, ctx, emit, tracker)
 
 
+
+def _emit_eval_report(
+    spec: RunSpec,
+    ctx: Context,
+    emit: Emit,
+    train_curve: list[dict[str, Any]],
+    eval_curve: list[dict[str, Any]],
+    extra: dict[str, Any] | None = None,
+    *,
+    prompt_eval: dict[str, Any] | None = None,
+    model: Any = None,
+    tokenizer: Any = None,
+    device: str | None = None,
+    amp_dtype: Any = None,
+) -> dict[str, Any]:
+    eval_cfg = getattr(spec, "eval", None)
+    prompts_path = getattr(eval_cfg, "prompts_path", None) if eval_cfg is not None else None
+    enabled = True if eval_cfg is None else bool(getattr(eval_cfg, "enabled", True))
+    if prompt_eval is None and enabled and prompts_path and model is not None and tokenizer is not None and device is not None:
+        try:
+            from .llm_prompt_eval import run_llm_prompt_eval  # noqa: PLC0415
+
+            prompt_eval = run_llm_prompt_eval(
+                model=model,
+                tokenizer=tokenizer,
+                spec=spec,
+                ctx=ctx,
+                emit=emit,
+                device=device,
+                amp_dtype=amp_dtype,
+            )
+        except Exception as exc:  # noqa: BLE001 - prompt eval must not break training artifacts
+            emit.log("warn", f"prompt eval 执行失败：{exc}")
+            prompt_eval = {"status": "unavailable", "reason": "prompt_eval_exception", "error": str(exc)}
+    try:
+        report = build_eval_report(
+            spec=spec,
+            train_curve=train_curve,
+            eval_curve=eval_curve,
+            extra=extra,
+            prompt_eval=prompt_eval,
+        )
+    except Exception as exc:
+        emit.log("warn", f"eval_report 生成失败：{exc}")
+        report = {"version": 1, "status": "unavailable", "reason": str(exc), "summary": {}, "contract": {}}
+    out_path = ctx.output_dir / "eval_report.json"
+    try:
+        write_eval_report(out_path, report)
+        path_str: str | None = str(out_path)
+    except Exception as exc:
+        emit.log("warn", f"eval_report.json 写入失败：{exc}")
+        path_str = None
+    emit.eval_report({"status": report.get("status", "ok"), "path": path_str, "report": report})
+    return report
 def _sequence_logprob(
     torch: Any,
     model: Any,
@@ -856,6 +967,8 @@ def _train_dpo(
     start_step: int,
     total_steps: int,
     tracker: _PeakTracker | None = None,
+    train_curve: list[dict[str, Any]] | None = None,
+    eval_curve: list[dict[str, Any]] | None = None,
 ) -> None:
     """Preference optimisation with a LoRA policy and the frozen base as reference."""
     if cfg.adapter == Adapter.NONE:
@@ -926,15 +1039,28 @@ def _train_dpo(
         )
         if tracker is not None:
             tracker.record(vram_peak)
+        step_lr = float(scheduler.get_last_lr()[0])
         emit.step(
             step,
             loss=window_loss,
-            lr=float(scheduler.get_last_lr()[0]),
+            lr=step_lr,
             grad_norm=float(grad_norm),
             tokens_per_s=None,
             vram_peak_mib=float(vram_peak) if vram_peak is not None else None,
             elapsed_s=elapsed,
         )
+        if train_curve is not None:
+            train_curve.append(
+                {
+                    "step": step,
+                    "loss": float(window_loss),
+                    "lr": step_lr,
+                    "grad_norm": float(grad_norm),
+                    "vram_peak_mib": float(vram_peak) if vram_peak is not None else None,
+                    "elapsed_s": float(elapsed),
+                    "reward_margin": float(window_margin),
+                }
+            )
         emit.log("debug", f"DPO step {step}: 隐式奖励间隔均值 {window_margin:.4f}")
         window_loss = 0.0
         window_margin = 0.0
@@ -1181,6 +1307,8 @@ def _train_grpo(
     start_step: int,
     total_steps: int,
     tracker: _PeakTracker | None = None,
+    train_curve: list[dict[str, Any]] | None = None,
+    eval_curve: list[dict[str, Any]] | None = None,
 ) -> None:
     """GRPO-style policy gradient with an exact-match reward and a KL term.
 
@@ -1276,17 +1404,34 @@ def _train_grpo(
         vram_peak = torch.cuda.max_memory_allocated() / (1024 * 1024) if device == "cuda" else None
         if tracker is not None:
             tracker.record(vram_peak)
+        step_loss = window_loss / steps_done
+        step_lr = float(scheduler.get_last_lr()[0])
+        step_tps = float(sequences.shape[1] * group / elapsed) if elapsed > 0 else None
+        mean_reward = window_reward / max(steps_done, 1)
         emit.step(
             step,
-            loss=window_loss / steps_done,
-            lr=float(scheduler.get_last_lr()[0]),
+            loss=step_loss,
+            lr=step_lr,
             grad_norm=float(grad_norm),
-            tokens_per_s=float(sequences.shape[1] * group / elapsed) if elapsed > 0 else None,
+            tokens_per_s=step_tps,
             vram_peak_mib=float(vram_peak) if vram_peak is not None else None,
             elapsed_s=elapsed,
         )
+        if train_curve is not None:
+            train_curve.append(
+                {
+                    "step": step,
+                    "loss": float(step_loss),
+                    "lr": step_lr,
+                    "grad_norm": float(grad_norm),
+                    "tokens_per_s": step_tps,
+                    "vram_peak_mib": float(vram_peak) if vram_peak is not None else None,
+                    "elapsed_s": float(elapsed),
+                    "mean_reward": float(mean_reward),
+                }
+            )
         if step % 10 == 0 or step == total_steps:
-            emit.log("info", f"GRPO step {step}: mean reward {window_reward / max(steps_done, 1):.3f}")
+            emit.log("info", f"GRPO step {step}: mean reward {mean_reward:.3f}")
         if spec.train.save_every > 0 and step % spec.train.save_every == 0 and step < total_steps:
             _save_checkpoint(
                 model, tokenizer, optimizer, scheduler, step, spec, ctx, emit,

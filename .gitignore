@@ -28,6 +28,7 @@ logs/
 
 # --- local scratch (never committed) ---
 .drafts/
+.tmp-run/
 .research/*.tmp
 
 # --- local env ---

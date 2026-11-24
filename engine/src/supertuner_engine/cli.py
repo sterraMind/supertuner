@@ -247,6 +247,67 @@ def run(
     raise typer.Exit(outcome.exit_code)
 
 
+@app.command()
+def matrix(
+    matrix_file: Annotated[Path, typer.Option("--matrix", help="矩阵定义 JSON（base + sweep）")],
+    out_dir: Annotated[Path, typer.Option("--out-dir", help="展开后的 specs 与 matrix.json 输出目录")],
+    dry_run: Annotated[bool, typer.Option("--dry-run", help="只展开并写出 specs/manifest，不执行训练")] = True,
+    run_all: Annotated[bool, typer.Option("--run", help="顺序执行每个展开后的 RunSpec（可能很慢/占 GPU）")] = False,
+    as_json: JsonOption = True,
+) -> None:
+    """v0.3 P0：将单变量实验矩阵展开为多个 RunSpec，并可选顺序执行。"""
+    try:
+        raw = json.loads(matrix_file.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        _fail(f"matrix 文件不存在：{matrix_file}", code=EXIT_INFEASIBLE)
+    except Exception as exc:  # noqa: BLE001
+        _fail(f"无法解析 matrix：{exc}", code=EXIT_INFEASIBLE)
+
+    try:
+        from .experiment import write_expanded_matrix  # noqa: PLC0415
+
+        manifest = write_expanded_matrix(raw, matrix_path=matrix_file.resolve(), out_dir=out_dir.resolve())
+    except Exception as exc:  # noqa: BLE001
+        _fail(f"矩阵展开失败：{exc}", code=EXIT_INFEASIBLE)
+
+    results: list[dict[str, Any]] = []
+    if run_all and not dry_run:
+        for variant in manifest.get("variants", []):
+            spec_path = Path(str(variant["spec_path"]))
+            try:
+                run_spec = _load_spec(spec_path)
+            except Exception as exc:  # noqa: BLE001
+                results.append({"spec_path": str(spec_path), "ok": False, "error": f"load failed: {exc}"})
+                continue
+            run_dir = (out_dir.resolve() / "runs" / str(variant.get("run_name") or spec_path.stem)).resolve()
+            run_dir.mkdir(parents=True, exist_ok=True)
+            ctx = _context(run_dir)
+            emitter = Emitter(sys.stdout, run_dir.name)
+            outcome = execute(run_spec, ctx, emitter, stderr=sys.stderr, run_id=run_dir.name)
+            results.append(
+                {
+                    "run_name": variant.get("run_name"),
+                    "spec_path": str(spec_path),
+                    "run_dir": str(run_dir),
+                    "ok": outcome.ok,
+                    "status": outcome.status,
+                    "exit_code": outcome.exit_code,
+                    "steps": outcome.steps_completed,
+                }
+            )
+            if outcome.exit_code not in (EXIT_COMPLETED,):
+                # continue matrix but report failure; caller can inspect manifest/results
+                pass
+
+    payload: dict[str, Any] = {"ok": True, "manifest": manifest, "dry_run": bool(dry_run and not run_all)}
+    if results:
+        payload["results"] = results
+        payload["ok"] = all(bool(r.get("ok")) for r in results)
+    _echo_json(payload, as_json=as_json)
+    if not payload["ok"]:
+        raise typer.Exit(EXIT_FAILED)
+
+
 def main() -> None:
     app()
 

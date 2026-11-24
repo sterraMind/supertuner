@@ -163,6 +163,7 @@ def test_event_types_constant_lists_required_v01_types():
         "phase_end",
         "run_end",
         "memory_report",
+        "eval_report",
     } <= EVENT_TYPES
 
 
@@ -199,7 +200,21 @@ def test_null_emitter_accepts_everything():
     emit.error("x")
     emit.run_end("failed")
     emit.memory_report({"planned_mib": None, "measured_peak_mib": None})
+    emit.eval_report({"status": "ok", "path": None, "report": {}})
     assert emit.step_count == 0
+
+
+def test_eval_report_event_round_trips():
+    stream = io.StringIO()
+    emit = Emitter(stream, "run", clock=lambda: 1234)
+    emit.eval_report({"status": "ok", "path": "/tmp/eval_report.json", "report": {"summary": {"train": {"steps": 10}}}})
+    event = _lines(stream)[0]
+    assert event["type"] == "eval_report"
+    assert event["ts"] == 1234
+    assert event["status"] == "ok"
+    assert event["path"] == "/tmp/eval_report.json"
+    assert event["report"]["summary"]["train"]["steps"] == 10
+    assert parse_event_line(stream.getvalue().strip()) is not None
 
 
 def test_unicode_is_not_escaped():

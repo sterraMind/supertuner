@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import type { MemoryReport, OOMRetry, RunEnd, RunEvent, RunStatus } from "@supertuner/core";
+import type { EvalReport, MemoryReport, OOMRetry, RunEnd, RunEvent, RunStatus } from "@supertuner/core";
 import { formatApiError, getApiClient, type StreamStatus } from "../lib/api";
 import {
   copyText,
@@ -50,6 +50,8 @@ function eventKey(event: RunEvent): string {
       return `memory_report:${event.ts}`;
     case "oom_retry":
       return `oom_retry:${event.ts}:${event.attempt}`;
+    case "eval_report":
+      return `eval_report:${event.ts}`;
   }
 }
 
@@ -155,6 +157,10 @@ export function RunDetail() {
   // OOM 有限次自动重试（v0.2 T4 / G4）：收集所有 oom_retry 事件（按 ts 升序），
   // 供下方显示「第 N 次重试换用更保守配置」的一行提示。
   const oomRetries = useMemo<OOMRetry[]>(() => events.filter((event): event is OOMRetry => event.type === "oom_retry"), [events]);
+  const evalReport = useMemo<EvalReport | null>(() => {
+    const found = [...events].reverse().find((event) => event.type === "eval_report");
+    return found && found.type === "eval_report" ? (found as EvalReport) : null;
+  }, [events]);
   const stepRows: StepRow[] = steps.map((step) => step);
   const maxSteps = run?.spec.train.max_steps ?? 0;
   const progress = status === "completed" ? 1 : maxSteps > 0 && latestStep ? Math.min(1, latestStep.step / maxSteps) : 0;
@@ -422,6 +428,56 @@ export function RunDetail() {
                 </p>
               ))}
             </div>
+            </section>
+          ) : null}
+
+          {evalReport ? (
+            <section className="panel" aria-labelledby="eval-heading">
+              <div className="panel-head">
+                <h2 id="eval-heading">Eval report</h2>
+                <Badge tone={evalReport.status === "ok" ? "ok" : evalReport.status === "unavailable" ? "warn" : "neutral"}>
+                  {evalReport.status}
+                </Badge>
+              </div>
+              <div className="panel-body">
+                {(() => {
+                  const r = (evalReport.report ?? {}) as Record<string, unknown>;
+                  const summary = (r.summary ?? {}) as Record<string, unknown>;
+                  const stability = (summary.stability ?? {}) as Record<string, unknown>;
+                  const grad = (summary.grad_norm ?? {}) as Record<string, unknown>;
+                  const evalCurve = (summary.eval_curve ?? {}) as Record<string, unknown>;
+                  const overfit = (summary.overfitting ?? {}) as Record<string, unknown>;
+                  const notes = Array.isArray(r.notes) ? (r.notes as string[]) : [];
+                  return (
+                    <>
+                      <dl className="kv">
+                        <dt>train steps</dt>
+                        <dd className="mono">{formatNumber(stability.steps as number | null | undefined)}</dd>
+                        <dt>loss tail mean</dt>
+                        <dd className="mono">{formatNumber(stability.loss_mean_tail as number | null | undefined, 4)}</dd>
+                        <dt>loss trend</dt>
+                        <dd>{(stability.loss_trend_tail as string | null | undefined) ?? "—"}</dd>
+                        <dt>grad spikes</dt>
+                        <dd className="mono">{formatNumber(grad.spike_count as number | null | undefined)}</dd>
+                        <dt>eval points</dt>
+                        <dd className="mono">{formatNumber(evalCurve.count as number | null | undefined)}</dd>
+                        <dt>eval last</dt>
+                        <dd className="mono">{formatNumber(evalCurve.loss_last as number | null | undefined, 4)}</dd>
+                        <dt>train-eval gap</dt>
+                        <dd className="mono">{formatNumber(overfit.train_eval_gap as number | null | undefined, 4)}</dd>
+                        <dt>overfit signal</dt>
+                        <dd>{(overfit.signal as string | null | undefined) ?? "—"}</dd>
+                      </dl>
+                      {evalReport.path ? <p className="small muted mono">{evalReport.path}</p> : null}
+                      {notes.length > 0 ? (
+                        <ul className="small muted">
+                          {notes.map((n, i) => <li key={i}>{n}</li>)}
+                        </ul>
+                      ) : null}
+                    </>
+                  );
+                })()}
+              </div>
             </section>
           ) : null}
 

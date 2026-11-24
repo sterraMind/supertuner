@@ -282,6 +282,15 @@ export const OutputSpecSchema = z.object({
   hub_repo: z.string().nullable().default(null),
 });
 
+
+export const EvalSpecSchema = z.object({
+  enabled: z.boolean().default(true),
+  prompts_path: z.string().nullable().default(null),
+  holdout: z.boolean().default(true),
+  source_dir: z.string().nullable().default(null),
+  metrics: z.array(z.string()).default([]),
+});
+export type EvalSpec = z.infer<typeof EvalSpecSchema>;
 export const LicenceAckSchema = z.object({
   family: z.string(),
   license_id: z.string(),
@@ -297,6 +306,8 @@ export const RunSpecSchema = z.object({
   output: OutputSpecSchema.default({}),
   backend: z.string().nullable().default(null),
   licence_ack: LicenceAckSchema.nullable().default(null),
+  /** v0.3 P0：评估配置（默认启用训练摘要/过拟合与稳定性分析）。 */
+  eval: EvalSpecSchema.default({}),
   /** 规划前由 server 按校准键查库注入；engine 只读它做备注，不改动预算。 */
   calibration: CalibrationSchema.nullable().default(null),
 });

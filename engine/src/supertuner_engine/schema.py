@@ -450,6 +450,22 @@ class Calibration(BaseModel):
     avg_delta_pct: float | None = None  # 平均偏差（实测-计划）/计划*100；无有效样本时为 None
 
 
+
+class EvalSpec(BaseModel):
+    """v0.3 P0：训练后的自动评估配置（LLM 线优先，视频评估先做接口契约）。
+
+    - prompts_path: 冻结评估 prompt/样本集路径（json/jsonl）；为空则只做训练过程指标汇总。
+    - holdout: 为 True 时用数据集 val_fraction 切出的留出集指标计算过拟合 gap。
+    - source_dir: 编辑/参考素材目录（视频/图像评估用；LLM 线可为空）。
+    - metrics: 额外请求的指标名（扩展用）；稳定性与过拟合摘要始终尝试计算。
+    """
+
+    enabled: bool = True
+    prompts_path: str | None = None
+    holdout: bool = True
+    source_dir: str | None = None
+    metrics: list[str] = Field(default_factory=list)
+
 class RunSpec(BaseModel):
     schema_version: Literal[1] = 1
     config: RunConfig
@@ -458,6 +474,8 @@ class RunSpec(BaseModel):
     output: OutputSpec = Field(default_factory=OutputSpec)
     backend: str | None = None  # None => auto-select from registry
     licence_ack: LicenceAck | None = None
+    # v0.3 P0：评估配置（默认启用训练摘要/过拟合与稳定性分析）
+    eval: EvalSpec = Field(default_factory=EvalSpec)
     # 规划前由 server 按校准键查库注入；engine 只读它做备注，不改动预算。
     calibration: Calibration | None = None
 

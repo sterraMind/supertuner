@@ -110,6 +110,7 @@ export function defaultRunSpec(): RunSpec {
     output: defaultOutput(),
     backend: null,
     licence_ack: null,
+    eval: { enabled: true, prompts_path: null, holdout: true, source_dir: null, metrics: [] },
     calibration: null,
   };
 }

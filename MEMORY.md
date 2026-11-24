@@ -1,6 +1,6 @@
 # SuperTuner 项目记忆
 
-更新时间：2026-11-18
+更新时间：2026-11-24
 
 ## 目标
 
@@ -68,3 +68,23 @@
 - SuperTuner 当前可占有的产品空位是显存与主存预算、逐步计划、许可门禁、运行记录、SSE 监控、LLM 与视频统一 RunSpec；视频训练真实验证仍是缺口。
 - 调研落地：`docs/development/02-adoption-plan.md` 把可借鉴点拆成 P0/P1 任务；其中 auto_budget、train_blocks、预览降档、memory_report 已实现并回归。musubi 没有 `--train_blocks` 直接 flag：`train_blocks`（如 `20-49`）现映射为 `--network_args` 的 `include_patterns=[r'.*blocks\.(?:20|21|…|49)\..*']`（完整匹配模块名 `transformer_blocks.20.attn.to_q` 等）并保留默认 `exclude_patterns`（img_mod/txt_mod/modulation），编译期发 `I_TRAIN_BLOCKS_MAPPED`。
 - 环境注意：engine 由 server 以 `uv run` 派生的 python 受 DSH sandbox 写根限制（workspace 可写，`~/.supertuner` 与 `~/.cache/huggingface` 默认不可写），server 启动时把 `SUPERTUNER_RUNS_DIR`/`HF_HOME`/`HF_DATASETS_CACHE` 指向 workspace 可端到端跑通。
+
+## v0.3 P0 实验与评估层（2026-11-20，LLM 线实现）
+
+- 用户方向（m05252/m05284）：训练框架是工具，SuperTuner 作为“训练实验与验证层”回答“数据→效果、训法→问题”；先做 LLM 线最小可自动评估闭环，视频评估先做接口契约（本机 8GB、无 musubi/视频权重，CLIP/LPIPS 需模型）。
+- **评估契约（已落地）**：ngine/src/supertuner_engine/schema.py 新增 EvalSpec（enabled/prompts_path/holdout/source_dir/metrics，默认启用）并挂到 RunSpec.eval；ngine/src/supertuner_engine/events.py 增加 val_report 事件类型与 Emit/Emitter/NullEmitter.eval_report；packages/core/src/contracts.ts 增加 EvalSpecSchema/RunSpec.eval，packages/core/src/events.ts 增加 EvalReportEvent 并入 RunEventSchema；packages/web/src/lib/planner-state.ts 默认 spec 显式包含 val；packages/web/src/pages/RunDetail.tsx 解析并展示最新 val_report（状态、训练/梯度/评估曲线摘要、过拟合信号、产物路径、notes）。
+- **曲线摘要与报告产物（已落地）**：ngine/src/supertuner_engine/backends/eval_report.py 提供 summarise_stability/uild_eval_report/write_eval_report（纯 Python，无 torch），输出训练 loss/梯度稳定性、eval 曲线、train-eval gap 过拟合信号，以及 LLM/视频指标契约字段。
+ative_llm 在 SFT/DPO/GRPO 路径记录 step 与 eval 曲线，训练结束写 output/eval_report.json、发射 val_report 事件，并将 val_report.json 加入 compile expected artifacts（ngine/tests/test_native_compile.py 已同步）。
+- **冻结 prompt 集与 LLM prompt 评估（已落地，启发式）**：docs/development/eval/prompts/llm_smoke_v1.json（6 条，固定 seed/max_new_tokens，math/instruction/completion/zh 烟雾样本，非 benchmark）；ngine/src/supertuner_engine/backends/prompt_eval.py 负责加载 JSON/JSONL/裸 list prompt 集与轻量打分（non_empty、exact/contains、token_overlap_f1 等）；ngine/src/supertuner_engine/backends/llm_prompt_eval.py 在训练结束且配置 spec.eval.prompts_path 时用已加载模型做固定种子 greedy 生成并聚合结果；val_report 记录 prompt_eval 摘要与状态（ok/partial/unavailable，失败降级不阻断训练/产物），并在契约中补充 prompt_eval_non_empty_rate/exact_match_rate/token_overlap_f1。
+- **单变量矩阵展开与 CLI（已落地）**：ngine/src/supertuner_engine/experiment.py（xpand_matrix/write_expanded_matrix，单变量 sweep.path×values，生成命名/每变体 output 子目录/可选 eval_prompts 覆盖，逐个 RunSpec 校验，输出 specs 与 matrix.json manifest）；ngine/src/supertuner_engine/cli.py 新增 matrix --matrix --out-dir [--dry-run] [--run]，默认 dry-run 仅展开写 manifest，--run --no-dry-run 时顺序执行展开后的 specs。
+- **server/web 接入现状**：val_report.json 落 run output 目录，可由现有 artifacts 扫描与 /api/runs/:id/artifacts 暴露；val_report 事件进入事件流/前端 RunDetail 展示。未新增 eval_report 专用 DB 表/查询或实验对比页（P1）。
+- **测试与回归（2026-11-20）**：新增/更新 ngine/tests/test_prompt_eval.py、ngine/tests/test_experiment.py、ngine/tests/test_eval_report.py（含 prompt_eval 集成/降级）、packages/core/test/eval.test.ts、ngine/tests/test_events.py、ngine/tests/test_native_compile.py。全量回归通过：engine 252 passed；core 27 passed；server 52 passed；web 68 passed；pnpm -r typecheck 通过；pnpm build 通过（web 447.46 kB / gzip 131.47 kB）。
+- **限制**：prompt 评估为启发式（exact/contains/token-overlap、non-empty，greedy+固定 seed），非外部 judge/benchmark；未实现独立 evaluator 后端、CLIP/LPIPS/时序一致性/视频生成打分与 web 实验对比页；本机无 musubi/视频权重，视频线仍为契约/接口层；矩阵执行为顺序单机（--run 可能很慢/占 GPU），未做云排期。
+
+## dev4090 VBench 评估环境（2026-11-24 实测通过）
+
+- 目标：在 dev4090（RTX 4090 24GB，Ubuntu 24.04 WSL）用 VBench 0.1.5 跑视频评测，支撑 B 路线（窄域视频质量评估）。用户批评过「先探查和网络搜索再动手」，本段所有解法都是先读源码/搜上游 issue 再落地。
+- 环境：Python 3.11.9 + torch 2.15.0+cu132 + vbench 0.1.5，venv 在 `~/vbench-eval/.venv`；detectron2 未装（语义 9 维不可用，custom_input 只支持 6 技术维）。
+- **6 技术维全部跑通**：3 个 768×512×125 帧测试视频，结果落 `~/vbench-eval/smoke/out/smoke_final_eval_results.json`。聚合分 subject_consistency 0.996 / background_consistency 0.997 / motion_smoothness 0.967 / dynamic_degree 0.0（静态视频预期）/ aesthetic_quality 0.227 / imaging_quality 0.302。之前「6 维 blocked」判断在走代理后已被推翻，`docs/research/09-vbench-feasibility.md` 已追加实测更正。
+- 五个踩坑与解法（详见 `docs/development/eval/dev4090/README.md`）：① Python 3.12 无 cu121 轮子 + tokenizers 要 Rust → 3.11；② pypi.org 超时 → 清华镜像；③ VBench 写死 `unzip -d` 而 WSL 无 unzip 且 sudo 要密码 → `~/.local/bin/unzip` 包装器调 Windows 侧 7z（本机 `C:\Program Files\7-Zip\7z.exe`，wslpath 转路径），已固化脚本；④ `clip` 要 pkg_resources → 装 setuptools<81；⑤ aesthetic 权重旧 URL 只给 4KB 错误页（上游 issue #187）→ 改 raw.githubusercontent.com；MUSIQ 权重中断留坏文件 → 重下完整 108,610,983 字节。
+- 复用脚本固化在 `docs/development/eval/dev4090/`：`install-unzip.sh`、`smoke-vbench.sh`、`README.md`。运行要点：ssh 保持前台（`ServerAliveInterval=30`），脚本放 `~/vbench-eval/` 持久路径（/tmp 跨会话丢、后台进程随 ssh 断被杀）；`VBench.evaluate()` 返回 None，结果写文件，接入 evaluator 时读 json 而非返回值。

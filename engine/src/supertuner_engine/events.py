@@ -35,6 +35,7 @@ EVENT_TYPES: frozenset[str] = frozenset(
         "run_end",
         "memory_report",
         "oom_retry",
+        "eval_report",
     }
 )
 
@@ -69,6 +70,8 @@ class Emit(Protocol):
     def error(self, message: str, detail: str | None = None) -> None: ...
 
     def memory_report(self, report: dict[str, Any]) -> None: ...
+
+    def eval_report(self, report: dict[str, Any]) -> None: ...
 
     def oom_retry(
         self,
@@ -195,6 +198,10 @@ class Emitter:
     def memory_report(self, report: dict[str, Any]) -> None:
         self.emit({"type": "memory_report", **report})
 
+    def eval_report(self, report: dict[str, Any]) -> None:
+        """v0.3 P0：训练结束后的自动评估报告（稳定性/过拟合/曲线摘要）。"""
+        self.emit({"type": "eval_report", **report})
+
     def oom_retry(
         self,
         *,
@@ -263,6 +270,9 @@ class NullEmitter:
         return None
 
     def memory_report(self, report: dict[str, Any]) -> None:
+        return None
+
+    def eval_report(self, report: dict[str, Any]) -> None:
         return None
 
     def oom_retry(

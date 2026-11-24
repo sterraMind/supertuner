@@ -69,12 +69,19 @@ def test_compile_emits_single_in_process_train_step(tmp_path):
     assert step.kind == "train"
     assert step.command is None
     assert step.cwd == str(ctx.run_dir)
-    assert plan.expected_artifacts == [str(ctx.run_dir / "output" / "adapter" / "adapter_model.safetensors")]
+    assert plan.expected_artifacts == [
+        str(ctx.run_dir / "output" / "adapter" / "adapter_model.safetensors"),
+        str(ctx.run_dir / "output" / "eval_report.json"),
+    ]
 
 
 def test_full_finetune_artifact_is_a_full_model(tmp_path):
-    plan = NativeLLMBackend().compile(_spec(adapter=Adapter.NONE), _ctx(tmp_path))
-    assert plan.expected_artifacts[0].endswith("model.safetensors")
+    ctx = _ctx(tmp_path)
+    plan = NativeLLMBackend().compile(_spec(adapter=Adapter.NONE), ctx)
+    assert plan.expected_artifacts == [
+        str(ctx.run_dir / "output" / "model" / "model.safetensors"),
+        str(ctx.run_dir / "output" / "eval_report.json"),
+    ]
 
 
 def test_preference_training_compiles_with_lora(tmp_path):

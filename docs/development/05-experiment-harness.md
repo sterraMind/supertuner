@@ -104,3 +104,18 @@
 | P1 | web 实验对比页 | 把分数变成可读结论 |
 | P2 | 云 GPU 排期/远程跑（Kaggle/Colab） | 放大矩阵规模 |
 | 暂缓 | DMD/DMAD 蒸馏、自研算子 | 训练框架是工具，不是生态（本次定位） |
+
+## 6. 实现状态（2026-11-20，v0.3 P0 首批）
+
+已实现（LLM 线最小闭环 + 接口契约）：
+- RunSpec.eval（EvalSpec: enabled/prompts_path/holdout/source_dir/metrics）在 engine schema、core contracts、web planner 默认值中落地；val_report 事件类型在 engine/core events 中落地。
+- ngine/src/supertuner_engine/backends/eval_report.py：训练曲线/评估曲线稳定性摘要、train-eval gap 过拟合信号、val_report.json 写出；
+ative_llm 在 SFT/DPO/GRPO 路径收集曲线并在结束时发射/落盘（含 expected artifact）。
+- docs/development/eval/prompts/llm_smoke_v1.json 冻结烟雾 prompt 集；prompt_eval.py + llm_prompt_eval.py 提供启发式 prompt 评估（greedy、固定 seed、exact/contains/token-overlap/non-empty）并写入 val_report.summary.prompt_eval 与契约字段；失败降级为 unavailable/partial，不阻断训练。
+- xperiment.py + cli.py matrix：单变量矩阵展开为多个校验通过的 RunSpec 与 matrix.json manifest，支持可选输出目录与冻结 prompt 覆盖，默认 dry-run，可选顺序执行。
+- web RunDetail 展示 val_report；server 现有 output artifacts 扫描可发现 val_report.json（无需专用 DB 表）。
+
+限制与后续：
+- prompt 评估为轻量启发式，非 benchmark/外部 judge；未接入 CLIP/LPIPS/时序一致性与视频生成评估（需模型/权重，本机无 musubi/视频权重）。
+- 未实现 web 实验对比页与 eval_report 专用查询；矩阵执行为单机顺序，未做云排期/并行调度。
+- 回归：engine 252 / core 27 / server 52 / web 68 通过，pnpm -r typecheck 与 pnpm build 通过。
